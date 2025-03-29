@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome to HAL - Firewall Management{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1>Welcome to HAL Project</h1>
+    <p>Your Django application with PostgreSQL is running successfully.</p>
+    
+    <div class="row mt-5">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Firewall Connector - IP Object Management</h3>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">API Endpoints</h5>
+                    <p class="card-text">
+                        Use our <a href="{% url 'core:delete_ip_form' %}" class="btn btn-danger btn-sm">web interface</a> 
+                        or the following API endpoints to manage IP objects in firewalls:
+                    </p>
+                    
+                    <div class="mt-4">
+                        <h6>Delete IP Object:</h6>
+                        <pre class="bg-light p-3 border rounded">POST /api/firewall/ip-objects/delete/</pre>
+                        <p>Request payload example:</p>
+<pre class="bg-light p-3 border rounded">
+{
+    "firewall_type": "test", 
+    "ip_object_id": "TestServer",
+    "connection_params": {
+        "host": "firewall.example.com",
+        "username": "admin",
+        "password": "password123"
+    }
+}
+</pre>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h6>Check Task Status:</h6>
+                        <pre class="bg-light p-3 border rounded">GET /api/tasks/&lt;task_id&gt;/</pre>
+                        <p>Response example:</p>
+<pre class="bg-light p-3 border rounded">
+{
+    "task_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "status": "SUCCESS",
+    "result": {
+        "success": true,
+        "message": "Successfully deleted IP object TestServer and its dependencies",
+        "details": {
+            "ip_object_deleted": true,
+            "groups_modified": ["AllServers"],
+            "groups_deleted": [],
+            "rules_modified": ["AllowTestAccess"],
+            "rules_deleted": ["AllowTestAccess"]
+        }
+    }
+}
+</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h3 class="mb-0">Support</h3>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">The HAL application supports the following firewall types:</p>
+                    <ul class="list-group">
+                        <li class="list-group-item">Check Point</li>
+                        <li class="list-group-item">Fortinet FortiGate</li>
+                        <li class="list-group-item">Test Firewall (for development)</li>
+                    </ul>
+                    
+                    <p class="mt-4">For development and testing, use the "test" firewall type which provides a simulated environment with mock data.</p>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h3 class="mb-0">User Information</h3>
+                </div>
+                <div class="card-body">
+                    <p><strong>Username:</strong> {{ user.username }}</p>
+                    <p><strong>Email:</strong> {{ user.email }}</p>
+                    <p><strong>Last Login:</strong> {{ user.last_login|date:"F j, Y g:i A" }}</p>
+                    <p><strong>Staff Status:</strong> {% if user.is_staff %}Yes{% else %}No{% endif %}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

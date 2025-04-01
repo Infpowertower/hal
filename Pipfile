@@ -13,6 +13,11 @@ redis = "~=4.6.0"
 django-celery-beat = "~=2.5.0"
 django-celery-results = "~=2.5.1"
 requests = "*"
+django-rest-framework = "*"
+ipaddress = "*"
+djangorestframework = "*"
+ipython = "*"
+pytest-django = "*"
 
 [dev-packages]
 django-debug-toolbar = "~=4.0.0"

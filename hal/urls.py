@@ -9,6 +9,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
     
+    # API URLs
+    path('api/netmap/', include('netmap.urls')),
+    
     # Authentication URLs
     path('login/', core_views.login_view, name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),

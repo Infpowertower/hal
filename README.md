@@ -6,8 +6,10 @@ A Django project with PostgreSQL 14 database using Docker.
 
 - Docker
 - Docker Compose
+- Python 3.10
+- Pipenv
 
-## Getting Started
+## Getting Started (Full Docker Setup)
 
 1. Clone the repository
 
@@ -24,10 +26,45 @@ docker-compose up --build  # Build and start the containers
 6. Celery workers process background tasks
 7. Celery Beat schedules periodic tasks
 
+## Development Environment Setup
+
+For local development, you can run Redis and PostgreSQL in Docker, while running Django and Celery directly on your machine. This provides faster development iteration.
+
+1. Install dependencies:
+
+```bash
+pipenv install
+pipenv install --dev  # Install development dependencies
+```
+
+2. Start the development environment:
+
+```bash
+./dev.sh
+```
+
+This script:
+- Starts Redis and PostgreSQL in Docker
+- Runs database migrations
+- Starts Celery worker and beat in tmux sessions
+- Starts Django development server
+
+3. Access the application at http://localhost:8000
+
+4. To stop the development environment:
+
+```bash
+./dev-stop.sh
+```
+
 ## Creating an Admin User
 
 ```bash
+# For Docker setup:
 docker-compose exec web python manage.py createsuperuser
+
+# For development setup:
+pipenv run python manage.py createsuperuser
 ```
 
 ## Troubleshooting
@@ -56,7 +93,11 @@ docker-compose exec db psql -U postgres -c "SELECT 1"
 To run Django management commands:
 
 ```bash
+# For Docker setup:
 docker-compose exec web python manage.py [command]
+
+# For development setup:
+pipenv run python manage.py [command]
 ```
 
 Example commands:
@@ -105,4 +146,4 @@ The application uses the following environment variables:
 - `CELERY_BROKER_URL` - URL for the Celery broker (Redis)
 - `CELERY_RESULT_BACKEND` - Backend for storing task results
 
-These are configured in the docker-compose.yml file.
+These are configured in the docker-compose.yml file or .env.dev for local development.

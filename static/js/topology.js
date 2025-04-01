@@ -82,9 +82,10 @@ const NetworkTopology = () => {
         // Create links and nodes
         const link = g.append('g')
             .selectAll('line')
-            .data(topology.edges)
+            .data(topology.edges.filter(e => e.source !== e.target)) // Filter out self-loops (stub networks)
             .join('line')
             .attr('class', 'link-default')
+            .attr('data-network', d => d.network)
             .on('click', (event, d) => handleLinkClick(event, d));
             
         const node = g.append('g')
@@ -111,7 +112,7 @@ const NetworkTopology = () => {
             
         // Set up force simulation
         const simulation = d3.forceSimulation(topology.nodes)
-            .force('link', d3.forceLink(topology.edges)
+            .force('link', d3.forceLink(topology.edges.filter(e => e.source !== e.target))
                 .id(d => d.id)
                 .distance(100))
             .force('charge', d3.forceManyBody().strength(-300))
@@ -201,20 +202,27 @@ const NetworkTopology = () => {
         d3.select(event.currentTarget).classed('link-active', true);
         
         try {
+            // Determine the source and target IDs
+            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+            
             // Fetch connection details
-            const response = await fetch(`/api/netmap/connections/?device1_id=${link.source.id}&device2_id=${link.target.id}`);
+            const response = await fetch(`/api/netmap/connections/?device1_id=${sourceId}&device2_id=${targetId}`);
             if (!response.ok) throw new Error('Failed to fetch connection details');
             
             const data = await response.json();
             
+            // Get labels for display
+            const sourceLabel = typeof link.source === 'object' ? link.source.label : link.source_label;
+            const targetLabel = typeof link.target === 'object' ? link.target.label : link.target_label;
+            
             // Update info panel with connection details
             let html = `<h5>Connection Details</h5>`;
-            html += `<p><strong>Devices:</strong> ${link.source_label} ↔ ${link.target_label}</p>`;
+            html += `<p><strong>Devices:</strong> ${sourceLabel} ↔ ${targetLabel}</p>`;
+            html += `<p><strong>Network:</strong> ${link.network}</p>`;
             
             if (data.connections && data.connections.length > 0) {
                 data.connections.forEach(conn => {
-                    html += `<p><strong>Network:</strong> ${conn.network}</p>`;
-                    
                     if (conn.routes_through_connection && conn.routes_through_connection.length > 0) {
                         html += `<p><strong>Routes using this connection:</strong></p>`;
                         html += `<ul>`;
@@ -227,14 +235,16 @@ const NetworkTopology = () => {
                     }
                 });
             } else {
-                html += `<p>No detailed connection information available.</p>`;
+                html += `<p>No detailed routing information available.</p>`;
             }
             
             updateInfoPanel(html);
             
         } catch (error) {
             console.error('Error fetching connection details:', error);
-            updateInfoPanel(`<p>Error fetching details for connection between ${link.source_label} and ${link.target_label}</p>`);
+            const sourceLabel = typeof link.source === 'object' ? link.source.label : link.source_label;
+            const targetLabel = typeof link.target === 'object' ? link.target.label : link.target_label;
+            updateInfoPanel(`<p>Error fetching details for connection between ${sourceLabel} and ${targetLabel}</p>`);
         }
     };
     

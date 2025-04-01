@@ -256,12 +256,26 @@ class RoutingPathView(APIView):
         destination = request.query_params.get('destination')
         
         if not source or not destination:
-            return Response({
-                'error': 'Both source and destination parameters are required'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            error_response = {
+                'status': 'error',
+                'message': 'Both source and destination parameters are required',
+                'source': source or '',
+                'destination': destination or '',
+                'path': [],
+                'nat_applied': {'source': False, 'destination': False}
+            }
+            serializer = RoutingPathSerializer(error_response)
+            return Response(serializer.data, status=status.HTTP_400_BAD_REQUEST)
             
         try:
             result = RoutingService.find_route_path(source, destination)
+            
+            # Ensure all expected fields are present in the result
+            if 'path' not in result:
+                result['path'] = []
+            if 'nat_applied' not in result:
+                result['nat_applied'] = {'source': False, 'destination': False}
+                
             serializer = RoutingPathSerializer(result)
             
             if result['status'] == 'error':
@@ -269,4 +283,13 @@ class RoutingPathView(APIView):
                 
             return Response(serializer.data)
         except ValidationError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            error_response = {
+                'status': 'error',
+                'message': str(e),
+                'source': source,
+                'destination': destination,
+                'path': [],
+                'nat_applied': {'source': False, 'destination': False}
+            }
+            serializer = RoutingPathSerializer(error_response)
+            return Response(serializer.data, status=status.HTTP_400_BAD_REQUEST)

@@ -8,17 +8,39 @@ from netmap.models import Device, Interface, Route, NATMapping
 class Command(BaseCommand):
     help = 'Populates the database with sample network data from YAML'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--force',
+            action='store_true',
+            help='Force population even if data already exists',
+        )
+        parser.add_argument(
+            '--yaml-file',
+            type=str,
+            help='Optional path to a custom YAML file with network data',
+        )
+
     @transaction.atomic
     def handle(self, *args, **kwargs):
         self.stdout.write('Creating sample data for network topology...')
+        force = kwargs.get('force', False)
+        yaml_file = kwargs.get('yaml_file')
         
         # Check if data already exists
-        if Device.objects.exists():
+        if Device.objects.exists() and not force:
             self.stdout.write(self.style.WARNING('Data already exists. Skipping sample data creation.'))
+            self.stdout.write(self.style.WARNING('Use --force to populate anyway.'))
             return
             
         # Load data from YAML
-        fixtures_path = os.path.join('netmap', 'fixtures', 'network_data.yaml')
+        if yaml_file:
+            if not os.path.exists(yaml_file):
+                self.stdout.write(self.style.ERROR(f'YAML file not found: {yaml_file}'))
+                return
+            fixtures_path = yaml_file
+        else:
+            fixtures_path = os.path.join('netmap', 'fixtures', 'network_data.yaml')
+            
         self.load_from_yaml(fixtures_path)
         
         self.stdout.write(self.style.SUCCESS('Successfully created sample network data!'))

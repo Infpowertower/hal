@@ -175,6 +175,9 @@ class TopologyService:
         edges = []
         processed_networks = set()
         
+        # Keep track of already created connections to prevent duplicates
+        connections = set()
+        
         for device_id, networks in networks_by_device.items():
             device = next((d for d in nodes if d['id'] == device_id), None)
             
@@ -188,13 +191,21 @@ class TopologyService:
                     if network in d_networks:
                         devices_on_network.append(d_id)
                 
-                if len(devices_on_network) > 1 or include_stub_networks:
-                    # For non-stub networks or if explicitly including stub networks
+                # Only process non-stub networks or explicitly include stub networks
+                if len(devices_on_network) > 1:
+                    # For non-stub networks
                     for i, src_device_id in enumerate(devices_on_network):
                         src_device = next((d for d in nodes if d['id'] == src_device_id), None)
                         
                         # Connect each device to all other devices on this network
                         for dst_device_id in devices_on_network[i+1:]:
+                            # Skip if this connection has already been created for another network
+                            connection_key = tuple(sorted([src_device_id, dst_device_id]))
+                            if connection_key in connections and not include_stub_networks:
+                                continue
+                                
+                            connections.add(connection_key)
+                            
                             dst_device = next((d for d in nodes if d['id'] == dst_device_id), None)
                             
                             # Create an edge between these two devices
@@ -205,6 +216,21 @@ class TopologyService:
                                 'source_label': src_device['label'] if src_device else f"Device {src_device_id}",
                                 'target_label': dst_device['label'] if dst_device else f"Device {dst_device_id}"
                             })
+                elif include_stub_networks:
+                    # Handle stub networks if explicitly included
+                    if len(devices_on_network) == 1:
+                        device_id = devices_on_network[0]
+                        device = next((d for d in nodes if d['id'] == device_id), None)
+                        
+                        # Create a self-loop edge to represent the stub network
+                        edges.append({
+                            'source': device_id,
+                            'target': device_id,  # Self-loop
+                            'network': network,
+                            'source_label': device['label'] if device else f"Device {device_id}",
+                            'target_label': device['label'] if device else f"Device {device_id}",
+                            'is_stub': True
+                        })
                 
                 processed_networks.add(network)
         
@@ -492,6 +518,7 @@ class RoutingService:
         Returns:
             A dictionary with path information and status
         """
+        # Initialize result with default values
         result = {
             'status': 'success',
             'source': source_ip_or_network,
@@ -506,34 +533,66 @@ class RoutingService:
         # Step 1: Check for supernet conflicts in source and destination
         source_conflicts = RoutingService.check_supernet_conflicts(source_ip_or_network)
         if source_conflicts:
-            return {
+            error_result = {
                 'status': 'error',
                 'message': f"Source {source_ip_or_network} conflicts with more specific networks",
-                'conflicts': source_conflicts
+                'conflicts': source_conflicts,
+                'source': source_ip_or_network,
+                'destination': destination_ip_or_network,
+                'path': [],
+                'nat_applied': {
+                    'source': False,
+                    'destination': False
+                }
             }
+            return error_result
             
         dest_conflicts = RoutingService.check_supernet_conflicts(destination_ip_or_network)
         if dest_conflicts:
-            return {
+            error_result = {
                 'status': 'error',
                 'message': f"Destination {destination_ip_or_network} conflicts with more specific networks",
-                'conflicts': dest_conflicts
+                'conflicts': dest_conflicts,
+                'source': source_ip_or_network,
+                'destination': destination_ip_or_network,
+                'path': [],
+                'nat_applied': {
+                    'source': False,
+                    'destination': False
+                }
             }
+            return error_result
         
         # Step 2: Find source and destination networks
         source_matches = RoutingService.find_matching_networks(source_ip_or_network)
         if not source_matches:
-            return {
+            error_result = {
                 'status': 'error',
-                'message': f"Source {source_ip_or_network} not found in any known network"
+                'message': f"Source {source_ip_or_network} not found in any known network",
+                'source': source_ip_or_network,
+                'destination': destination_ip_or_network,
+                'path': [],
+                'nat_applied': {
+                    'source': False,
+                    'destination': False
+                }
             }
+            return error_result
             
         dest_matches = RoutingService.find_matching_networks(destination_ip_or_network)
         if not dest_matches:
-            return {
+            error_result = {
                 'status': 'error',
-                'message': f"Destination {destination_ip_or_network} not found in any known network"
+                'message': f"Destination {destination_ip_or_network} not found in any known network",
+                'source': source_ip_or_network,
+                'destination': destination_ip_or_network,
+                'path': [],
+                'nat_applied': {
+                    'source': False,
+                    'destination': False
+                }
             }
+            return error_result
         
         # For simplicity, just use the first match as the source/destination
         source_net = source_matches[0]
@@ -587,11 +646,15 @@ class RoutingService:
             try:
                 current_device = Device.objects.get(pk=current_device_id)
             except Device.DoesNotExist:
-                return {
+                error_result = {
                     'status': 'error',
                     'message': f"Device with ID {current_device_id} not found",
-                    'path': result['path']
+                    'path': result['path'],
+                    'source': source_ip_or_network,
+                    'destination': destination_ip_or_network,
+                    'nat_applied': result['nat_applied']
                 }
+                return error_result
             
             # Find best matching route on current device
             best_route = None
@@ -621,11 +684,15 @@ class RoutingService:
                     continue
             
             if not best_route:
-                return {
+                error_result = {
                     'status': 'error',
                     'message': f"No route found on device {current_device.name} for {current_ip_or_network}",
-                    'path': result['path']
+                    'path': result['path'],
+                    'source': source_ip_or_network,
+                    'destination': destination_ip_or_network,
+                    'nat_applied': result['nat_applied']
                 }
+                return error_result
             
             # Find the next hop device based on the gateway IP
             next_hop = None
@@ -642,11 +709,15 @@ class RoutingService:
                     break
             
             if not next_hop and best_route.type != 'connected':
-                return {
+                error_result = {
                     'status': 'error',
                     'message': f"No next hop found for route {best_route.destination_network} on device {current_device.name}",
-                    'path': result['path']
+                    'path': result['path'],
+                    'source': source_ip_or_network,
+                    'destination': destination_ip_or_network,
+                    'nat_applied': result['nat_applied']
                 }
+                return error_result
             
             # Find egress interface on current device
             egress_interface = None

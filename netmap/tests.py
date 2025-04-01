@@ -642,3 +642,337 @@ class APITests(TestCase):
         })
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data['status'], 'error')
+
+
+class RoutingFailureTestCase(TestCase):
+    """Test case specifically for the expected routing failure"""
+    
+    def setUp(self):
+        """Set up the test case with network data to test the routing failure"""
+        # Create two devices
+        self.router1 = Device.objects.create(name='router1', description='Test Router 1')
+        self.router3 = Device.objects.create(name='router3', description='Test Router 3')
+        
+        # Create interfaces on both devices
+        self.r1_if1 = Interface.objects.create(
+            device=self.router1,
+            name='eth0',
+            ip_address='10.0.0.1',
+            network='10.0.0.0/24',
+            status='up'
+        )
+        
+        self.r1_if2 = Interface.objects.create(
+            device=self.router1,
+            name='eth1',
+            ip_address='192.168.1.1',
+            network='192.168.1.0/24',
+            status='up'
+        )
+        
+        self.r3_if1 = Interface.objects.create(
+            device=self.router3,
+            name='eth0',
+            ip_address='10.2.0.1',
+            network='10.2.0.0/24',
+            status='up'
+        )
+        
+        self.r3_if2 = Interface.objects.create(
+            device=self.router3,
+            name='eth1',
+            ip_address='192.168.3.1',
+            network='192.168.3.0/24',
+            status='up'
+        )
+        
+        # Create connected routes
+        Route.objects.create(
+            source_device=self.router1,
+            destination_network='10.0.0.0/24',
+            type='connected'
+        )
+        
+        Route.objects.create(
+            source_device=self.router1,
+            destination_network='192.168.1.0/24',
+            type='connected'
+        )
+        
+        Route.objects.create(
+            source_device=self.router3,
+            destination_network='10.2.0.0/24',
+            type='connected'
+        )
+        
+        Route.objects.create(
+            source_device=self.router3,
+            destination_network='192.168.3.0/24',
+            type='connected'
+        )
+        
+        # Add route from router3 to router1's networks
+        Route.objects.create(
+            source_device=self.router3,
+            destination_network='10.0.0.0/24',
+            gateway_ip='10.2.0.254',
+            type='static',
+            metric=10
+        )
+        
+        Route.objects.create(
+            source_device=self.router3,
+            destination_network='192.168.1.0/24',
+            gateway_ip='10.2.0.254',
+            type='static',
+            metric=20
+        )
+        
+        # IMPORTANT: We deliberately DON'T add a route from router1 to router3's networks
+        # This will cause routing to fail when trying to route from router1 to router3
+    
+    def test_routing_failure_no_route(self):
+        """Test that routing fails when there's no route to the destination"""
+        # Try to route from router1's network to router3's network
+        result = RoutingService.find_route_path(
+            source_ip_or_network='192.168.1.10',  # IP in router1's network
+            destination_ip_or_network='192.168.3.10'  # IP in router3's network
+        )
+        
+        # Verify that the routing failed
+        self.assertEqual(result['status'], 'error')
+        self.assertIn('No route found', result['message'])
+        
+        # Routing in the other direction should work
+        result_reverse = RoutingService.find_route_path(
+            source_ip_or_network='192.168.3.10',  # IP in router3's network
+            destination_ip_or_network='192.168.1.10'  # IP in router1's network
+        )
+        
+        # Verify that the reverse routing works
+        self.assertEqual(result_reverse['status'], 'success')
+
+
+class RoutingSuccessTestCase(TestCase):
+    """Test case for successful routing scenarios"""
+    
+    def setUp(self):
+        """Set up test data for successful routing tests"""
+        # This test will use a simplified topology with the necessary routes
+        # Create three devices in a line: router1 -- router2 -- router3
+        self.router1 = Device.objects.create(name='router1', description='Test Router 1')
+        self.router2 = Device.objects.create(name='router2', description='Test Router 2')
+        self.router3 = Device.objects.create(name='router3', description='Test Router 3')
+        
+        # Create interfaces for each device
+        # Router 1 interfaces
+        self.r1_if1 = Interface.objects.create(
+            device=self.router1,
+            name='eth0',
+            ip_address='10.0.0.1',
+            network='10.0.0.0/24',  # Connected to router2
+            status='up'
+        )
+        
+        self.r1_if2 = Interface.objects.create(
+            device=self.router1,
+            name='eth1',
+            ip_address='192.168.1.1',
+            network='192.168.1.0/24',  # Local network
+            status='up'
+        )
+        
+        # Router 2 interfaces
+        self.r2_if1 = Interface.objects.create(
+            device=self.router2,
+            name='eth0',
+            ip_address='10.0.0.2',
+            network='10.0.0.0/24',  # Connected to router1
+            status='up'
+        )
+        
+        self.r2_if2 = Interface.objects.create(
+            device=self.router2,
+            name='eth1',
+            ip_address='10.1.0.1',
+            network='10.1.0.0/24',  # Connected to router3
+            status='up'
+        )
+        
+        # Router 3 interfaces
+        self.r3_if1 = Interface.objects.create(
+            device=self.router3,
+            name='eth0',
+            ip_address='10.1.0.2',
+            network='10.1.0.0/24',  # Connected to router2
+            status='up'
+        )
+        
+        self.r3_if2 = Interface.objects.create(
+            device=self.router3,
+            name='eth1',
+            ip_address='192.168.3.1',
+            network='192.168.3.0/24',  # Local network
+            status='up'
+        )
+        
+        # Create connected routes for all networks
+        # Router 1 connected routes
+        Route.objects.create(
+            source_device=self.router1,
+            destination_network='10.0.0.0/24',
+            type='connected'
+        )
+        
+        Route.objects.create(
+            source_device=self.router1,
+            destination_network='192.168.1.0/24',
+            type='connected'
+        )
+        
+        # Router 2 connected routes
+        Route.objects.create(
+            source_device=self.router2,
+            destination_network='10.0.0.0/24',
+            type='connected'
+        )
+        
+        Route.objects.create(
+            source_device=self.router2,
+            destination_network='10.1.0.0/24',
+            type='connected'
+        )
+        
+        # Router 3 connected routes
+        Route.objects.create(
+            source_device=self.router3,
+            destination_network='10.1.0.0/24',
+            type='connected'
+        )
+        
+        Route.objects.create(
+            source_device=self.router3,
+            destination_network='192.168.3.0/24',
+            type='connected'
+        )
+        
+        # Create static routes for routing between networks
+        # Router 1 routes to router3's networks
+        Route.objects.create(
+            source_device=self.router1,
+            destination_network='10.1.0.0/24',
+            gateway_ip='10.0.0.2',  # Via router2
+            type='static',
+            metric=10
+        )
+        
+        Route.objects.create(
+            source_device=self.router1,
+            destination_network='192.168.3.0/24',
+            gateway_ip='10.0.0.2',  # Via router2
+            type='static',
+            metric=20
+        )
+        
+        # Router 2 routes
+        Route.objects.create(
+            source_device=self.router2,
+            destination_network='192.168.1.0/24',
+            gateway_ip='10.0.0.1',  # Via router1
+            type='static',
+            metric=10
+        )
+        
+        Route.objects.create(
+            source_device=self.router2,
+            destination_network='192.168.3.0/24',
+            gateway_ip='10.1.0.2',  # Via router3
+            type='static',
+            metric=10
+        )
+        
+        # Router 3 routes to router1's networks
+        Route.objects.create(
+            source_device=self.router3,
+            destination_network='10.0.0.0/24',
+            gateway_ip='10.1.0.1',  # Via router2
+            type='static',
+            metric=10
+        )
+        
+        Route.objects.create(
+            source_device=self.router3,
+            destination_network='192.168.1.0/24',
+            gateway_ip='10.1.0.1',  # Via router2
+            type='static',
+            metric=20
+        )
+        
+        # Add NAT mappings for NAT tests
+        NATMapping.objects.create(
+            device=self.router1,
+            logical_ip_or_network='192.168.1.0/24',
+            real_ip_or_network='100.64.0.1',
+            type='source',
+            description='Internal to external'
+        )
+        
+        NATMapping.objects.create(
+            device=self.router3,
+            logical_ip_or_network='8.8.8.8',
+            real_ip_or_network='192.168.3.10',
+            type='destination',
+            description='External to internal'
+        )
+    
+    def test_direct_route(self):
+        """Test routing between directly connected networks"""
+        # Route from router1's local network to its own interface
+        result = RoutingService.find_route_path(
+            source_ip_or_network='192.168.1.10',
+            destination_ip_or_network='10.0.0.1'
+        )
+        
+        # Verify successful routing
+        self.assertEqual(result['status'], 'success')
+        self.assertEqual(len(result['path']), 1)  # Just one device in the path
+    
+    def test_multi_hop_route(self):
+        """Test routing across multiple hops"""
+        # Route from router1's local network to router3's local network
+        result = RoutingService.find_route_path(
+            source_ip_or_network='192.168.1.10',
+            destination_ip_or_network='192.168.3.10'
+        )
+        
+        # Verify successful routing
+        self.assertEqual(result['status'], 'success')
+        self.assertGreaterEqual(len(result['path']), 3)  # At least 3 hops in the path
+        
+        # Verify path goes through all three routers
+        path_devices = [hop['device'] for hop in result['path']]
+        self.assertIn('router1', path_devices)
+        self.assertIn('router2', path_devices)
+        self.assertIn('router3', path_devices)
+    
+    def test_nat_routing(self):
+        """Test routing with NAT translation"""
+        # Test source NAT
+        result = RoutingService.find_route_path(
+            source_ip_or_network='192.168.1.10',
+            destination_ip_or_network='8.8.8.8'
+        )
+        
+        # Verify NAT is applied
+        self.assertEqual(result['status'], 'success')
+        self.assertTrue(result['nat_applied']['source'])
+        
+        # Test destination NAT
+        result = RoutingService.find_route_path(
+            source_ip_or_network='10.0.0.20',
+            destination_ip_or_network='8.8.8.8'
+        )
+        
+        # Verify NAT is applied
+        self.assertEqual(result['status'], 'success')
+        self.assertTrue(result['nat_applied']['destination'])

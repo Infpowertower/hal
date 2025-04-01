@@ -161,3 +161,57 @@ footer {
     margin-top: 1rem;
     text-align: center;
 }
+
+/* Network topology specific styles */
+#topology-container {
+    width: 100%;
+    height: 70vh;
+    border: 1px solid #ccc;
+    background-color: #f8f9fa;
+    margin-bottom: 20px;
+}
+
+#network-info {
+    height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 20px;
+    background-color: #f8f9fa;
+}
+
+.form-box {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 20px;
+}
+
+.node-device {
+    fill: #4285F4;
+    stroke: #2A56C6;
+    stroke-width: 1.5px;
+    cursor: pointer;
+}
+
+.node-selected {
+    fill: #0F9D58;
+    stroke: #0B8043;
+}
+
+.link-default {
+    stroke: #666;
+    stroke-width: 2px;
+    cursor: pointer;
+}
+
+.link-active {
+    stroke: #0F9D58;
+    stroke-width: 3px;
+}
+
+.node-label {
+    font-size: 12px;
+    fill: #333;
+    pointer-events: none;
+}

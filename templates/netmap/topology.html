@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Network Topology{% endblock %}
+
+{% block extra_css %}
+<style>
+    #topology-container {
+        width: 100%;
+        height: 70vh;
+        border: 1px solid #ccc;
+        background-color: #f8f9fa;
+        margin-bottom: 20px;
+    }
+    
+    #network-info {
+        height: 200px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin-bottom: 20px;
+        background-color: #f8f9fa;
+    }
+    
+    .form-box {
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 20px;
+    }
+    
+    .node-device {
+        fill: #4285F4;
+    }
+    
+    .node-selected {
+        fill: #0F9D58;
+    }
+    
+    .link-default {
+        stroke: #666;
+        stroke-width: 2px;
+    }
+    
+    .link-active {
+        stroke: #0F9D58;
+        stroke-width: 3px;
+    }
+    
+    .node-label {
+        font-size: 12px;
+        fill: #333;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">Network Topology</h1>
+    
+    <div class="row">
+        <div class="col-md-9">
+            <!-- Topology Visualization Container -->
+            <div id="topology-container"></div>
+            
+            <!-- Network Information Panel -->
+            <div id="network-info" class="mt-3">
+                <h5>Information Panel</h5>
+                <p>Click on a device or connection to see details.</p>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <!-- Routing Query Form -->
+            <div class="form-box">
+                <h4 class="mb-3">Routing Query</h4>
+                <form id="routing-query-form">
+                    <div class="mb-3">
+                        <label for="source-input" class="form-label">Source IP/Network</label>
+                        <input type="text" class="form-control" id="source-input" placeholder="e.g., 192.168.1.5 or 10.0.0.0/24" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="destination-input" class="form-label">Destination IP/Network</label>
+                        <input type="text" class="form-control" id="destination-input" placeholder="e.g., 172.16.0.10 or 192.168.2.0/24" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">Find Path</button>
+                </form>
+                
+                <!-- Results Section -->
+                <div id="routing-results" class="mt-4">
+                    <h5>Results</h5>
+                    <div id="results-content">
+                        <p class="text-muted">No query results yet.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Controls -->
+            <div class="form-box mt-3">
+                <h4 class="mb-3">Controls</h4>
+                <div class="mb-2">
+                    <button id="reset-view-btn" class="btn btn-outline-secondary w-100">Reset View</button>
+                </div>
+                <div class="mb-2">
+                    <button id="toggle-stub-btn" class="btn btn-outline-secondary w-100">Show All Networks</button>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="zoom-on-select" checked>
+                    <label class="form-check-label" for="zoom-on-select">
+                        Zoom on Selection
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include React, React DOM, and D3.js -->
+<script src="https://unpkg.com/react@17/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- Include our topology script -->
+<script type="text/babel" src="{% static 'js/topology.js' %}"></script>
+{% endblock %}

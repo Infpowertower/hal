@@ -2,6 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
 
 from django.core.exceptions import ValidationError
 
@@ -11,6 +13,14 @@ from .serializers import (
     TopologySerializer, DeviceNetworksSerializer, RoutingPathSerializer
 )
 from .services import TopologyService, RoutingService
+
+
+@login_required
+def topology_view(request):
+    """
+    Render the topology visualization page with React
+    """
+    return render(request, 'netmap/topology.html')
 
 
 class DeviceViewSet(viewsets.ModelViewSet):

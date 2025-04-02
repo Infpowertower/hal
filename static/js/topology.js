@@ -166,26 +166,102 @@ const NetworkTopology = () => {
         d3.select(event.currentTarget).classed('node-selected', true);
         
         try {
-            // Fetch device networks
-            const response = await fetch(`/api/netmap/devices/${node.id}/networks/`);
-            if (!response.ok) throw new Error('Failed to fetch device networks');
+            // Fetch device networks and interfaces for the specific device
+            const [networksResponse, interfacesResponse] = await Promise.all([
+                fetch(`/api/netmap/devices/${node.id}/networks/`),
+                fetch(`/api/netmap/interfaces/?device=${node.id}`)
+            ]);
             
-            const data = await response.json();
+            if (!networksResponse.ok) throw new Error('Failed to fetch device networks');
+            if (!interfacesResponse.ok) throw new Error('Failed to fetch device interfaces');
+            
+            const networksData = await networksResponse.json();
+            const interfacesData = await interfacesResponse.json();
+            
+            // The API now properly filters interfaces by device
+            const deviceInterfaces = Array.isArray(interfacesData) ? interfacesData : [];
+            
+            // Group interfaces by network for easy lookup
+            const interfacesByNetwork = {};
+            deviceInterfaces.forEach(iface => {
+                if (!interfacesByNetwork[iface.network]) {
+                    interfacesByNetwork[iface.network] = [];
+                }
+                interfacesByNetwork[iface.network].push(iface);
+            });
             
             // Update info panel with device details
             let html = `<h5>${node.label}</h5>`;
-            html += `<p><strong>Interfaces:</strong> ${node.interfaces_count}</p>`;
-            html += `<p><strong>Networks:</strong></p>`;
-            html += `<ul>`;
-            data.forEach(network => {
-                html += `<li>${network.network} (${network.interfaces.length} interfaces)</li>`;
+            
+            // Add interfaces section with detailed info
+            html += `<p><strong>Interfaces:</strong></p>`;
+            
+            if (deviceInterfaces.length === 0) {
+                html += `<p class="text-muted">No interfaces found for this device.</p>`;
+            } else {
+                html += `<table class="table table-sm">`;
+                html += `<thead><tr><th>Name</th><th>IP Address</th><th>Network</th><th>Status</th></tr></thead>`;
+                html += `<tbody>`;
+            
+            // Group interfaces by name to handle multiple IPs on same interface
+            const groupedInterfaces = {};
+            deviceInterfaces.forEach(iface => {
+                const baseName = iface.name.split(':')[0]; // Split off alias numbers
+                if (!groupedInterfaces[baseName]) {
+                    groupedInterfaces[baseName] = [];
+                }
+                groupedInterfaces[baseName].push(iface);
             });
-            html += `</ul>`;
+            
+            // Display interfaces grouped by base name
+            Object.entries(groupedInterfaces).forEach(([baseName, interfaces]) => {
+                // Sort interfaces to show base interface first, then aliases
+                interfaces.sort((a, b) => a.name.length - b.name.length);
+                
+                // Display first interface in the group
+                const primaryIface = interfaces[0];
+                html += `<tr>`;
+                html += `<td>${primaryIface.name}</td>`;
+                html += `<td>${primaryIface.ip_address}</td>`;
+                html += `<td>${primaryIface.network}</td>`;
+                html += `<td><span class="badge ${primaryIface.status === 'up' ? 'bg-success' : 'bg-danger'}">${primaryIface.status}</span></td>`;
+                html += `</tr>`;
+                
+                // Display additional IPs if there are any
+                if (interfaces.length > 1) {
+                    for (let i = 1; i < interfaces.length; i++) {
+                        const aliasIface = interfaces[i];
+                        html += `<tr>`;
+                        html += `<td>${aliasIface.name}</td>`;
+                        html += `<td>${aliasIface.ip_address}</td>`;
+                        html += `<td>${aliasIface.network}</td>`;
+                        html += `<td><span class="badge ${aliasIface.status === 'up' ? 'bg-success' : 'bg-danger'}">${aliasIface.status}</span></td>`;
+                        html += `</tr>`;
+                    }
+                }
+            });
+            
+                html += `</tbody></table>`;
+            }
+            
+            // Add connected networks section
+            html += `<p><strong>Connected Networks:</strong></p>`;
+            
+            if (!networksData.length) {
+                html += `<p class="text-muted">No networks found for this device.</p>`;
+            } else {
+                html += `<ul>`;
+                networksData.forEach(network => {
+                    const interfaces = network.interfaces.map(iface => iface.name).join(', ');
+                    html += `<li>Network: ${network.network}</li>`;
+                });
+                html += `</ul>`;
+            }
             
             updateInfoPanel(html);
             
         } catch (error) {
-            console.error('Error fetching device networks:', error);
+            console.error('Error fetching device details:', error);
             updateInfoPanel(`<p>Error fetching details for device ${node.label}</p>`);
         }
     };

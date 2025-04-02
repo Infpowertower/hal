@@ -19,6 +19,7 @@ djangorestframework = "*"
 ipython = "*"
 pytest-django = "*"
 pyyaml = "*"
+django-filter = "*"
 
 [dev-packages]
 django-debug-toolbar = "~=4.0.0"

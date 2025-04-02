@@ -82,7 +82,7 @@ body {
     background: #212529;
 }
 
-#sidebar ul li.active > a,
+#sidebar ul li.active>a,
 a[aria-expanded="true"] {
     color: #fff;
     background: #212529;
@@ -114,11 +114,11 @@ main.container-fluid {
         height: 100%;
         transition: all 0.3s;
     }
-    
+
     #sidebar.mobile-active {
         left: 0;
     }
-    
+
     #content {
         width: 100%;
     }
@@ -201,13 +201,13 @@ footer {
 
 .link-default {
     stroke: #666;
-    stroke-width: 2px;
+    stroke-width: 10px;
     cursor: pointer;
 }
 
 .link-active {
     stroke: #0F9D58;
-    stroke-width: 3px;
+    stroke-width: 12px;
 }
 
 .node-label {
